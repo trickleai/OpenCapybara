@@ -1,0 +1,162 @@
+{
+	"name": "capybara-defaults",
+	"displayName": "Capybara Default Settings",
+	"description": "Default settings for Capybara - Claude Code Dashboard",
+	"version": "1.0.0",
+	"publisher": "capybara",
+	"license": "MIT",
+	"engines": {
+		"vscode": "^1.96.0"
+	},
+	"activationEvents": [
+		"onStartupFinished"
+	],
+	"main": "./out/extension.js",
+	"scripts": {
+		"compile": "tsc -p ./",
+		"watch": "tsc -watch -p ./"
+	},
+	"devDependencies": {
+		"@types/node": "^20.0.0",
+		"@types/vscode": "^1.96.0",
+		"typescript": "^5.3.0"
+	},
+	"contributes": {
+		"commands": [
+			{
+				"command": "capybara.closeSidebar",
+				"title": "Close Panel",
+				"icon": "$(close)"
+			},
+			{
+				"command": "capybara.openInFinder",
+				"title": "Open in Finder",
+				"icon": "$(folder-opened)"
+			},
+			{
+				"command": "capybara.repairClaudeDirectory",
+				"title": "Repair .claude Directory",
+				"icon": "$(tools)"
+			}
+		],
+		"menus": {
+			"view/title": [
+				{
+					"command": "capybara.closeSidebar",
+					"group": "navigation@100",
+					"when": "activeViewlet == 'workbench.view.extensions' || activeViewlet == 'workbench.view.explorer' || activeViewlet == 'workbench.view.search'"
+				}
+			],
+			"title/context": [
+				{
+					"command": "capybara.openInFinder",
+					"group": "navigation"
+				}
+			]
+		},
+		"configuration": {
+			"title": "Capybara",
+			"properties": {
+				"capybara.showDeveloperFeatures": {
+					"type": "boolean",
+					"default": false,
+					"description": "Show developer features like Terminal, Debug, and Run menus"
+				}
+			}
+		},
+		"configurationDefaults": {
+			"workbench.activityBar.location": "hidden",
+			"workbench.sideBar.location": "left",
+			"workbench.auxiliaryBar.visible": true,
+			"workbench.startupEditor": "none",
+			"workbench.tips.enabled": false,
+			"workbench.colorTheme": "Default Light Modern",
+			"workbench.statusBar.visible": false,
+			"workbench.panel.defaultLocation": "bottom",
+			"workbench.panel.opensMaximized": "never",
+			"workbench.view.alwaysShowHeaderActions": true,
+			"editor.fontSize": 14,
+			"editor.fontFamily": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+			"editor.lineHeight": 1.6,
+			"editor.wordWrap": "on",
+			"editor.minimap.enabled": false,
+			"editor.renderWhitespace": "none",
+			"editor.lineNumbers": "off",
+			"editor.glyphMargin": false,
+			"editor.folding": true,
+			"editor.foldingHighlight": false,
+			"editor.renderLineHighlight": "none",
+			"editor.overviewRulerBorder": false,
+			"editor.hideCursorInOverviewRuler": true,
+			"editor.scrollbar.vertical": "auto",
+			"editor.scrollbar.horizontal": "auto",
+			"editor.cursorBlinking": "smooth",
+			"editor.cursorSmoothCaretAnimation": "on",
+			"editor.smoothScrolling": true,
+			"editor.padding.top": 20,
+			"editor.padding.bottom": 20,
+			"terminal.integrated.defaultProfile.osx": null,
+			"terminal.integrated.tabs.enabled": false,
+			"terminal.integrated.fontFamily": "Menlo, Monaco, 'Courier New', monospace",
+			"terminal.integrated.fontSize": 14,
+			"terminal.integrated.letterSpacing": 1.2,
+			"terminal.integrated.lineHeight": 1.4,
+			"debug.console.fontSize": 14,
+			"debug.toolBarLocation": "hidden",
+			"window.commandCenter": true,
+			"workbench.editor.editorActionsLocation": "hidden",
+			"window.title": "${activeEditorShort}${separator}${rootName}",
+			"window.menuBarVisibility": "compact",
+			"window.restoreWindows": "preserve",
+			"workbench.editor.restoreViewState": true,
+			"files.hotExit": "onExitAndWindowClose",
+			"breadcrumbs.enabled": false,
+			"explorer.confirmDelete": false,
+			"explorer.confirmDragAndDrop": false,
+			"explorer.compactFolders": false,
+			"explorer.sortOrder": "modified",
+			"files.autoSave": "afterDelay",
+			"files.autoSaveDelay": 1000,
+			"files.defaultLanguage": "markdown",
+			"scm.defaultViewMode": "tree",
+			"git.enabled": true,
+			"git.decorations.enabled": false,
+			"git.timeline.showUncommitted": false,
+			"capybara.showDeveloperFeatures": false,
+			"extensions.ignoreRecommendations": true,
+			"extensions.showRecommendationsOnlyOnDemand": true,
+			"workbench.layoutControl.enabled": false,
+			"workbench.editor.showTabs": "multiple",
+			"search.showLineNumbers": false,
+			"search.smartCase": true,
+			"outline.icons": false,
+			"outline.problems.enabled": false,
+			"timeline.showUncommitted": false,
+			"chat.disableAIFeatures": true,
+			"security.workspace.trust.enabled": false,
+			"[markdown]": {
+				"editor.wordWrap": "on",
+				"editor.quickSuggestions": {
+					"other": false,
+					"comments": false,
+					"strings": false
+				},
+				"editor.fontSize": 16,
+				"editor.lineHeight": 2.0,
+				"editor.fontFamily": "Georgia, 'Times New Roman', serif",
+				"editor.tabSize": 2,
+				"editor.insertSpaces": true,
+				"editor.formatOnSave": false,
+				"editor.rulers": [],
+				"editor.renderIndentGuides": false,
+				"editor.wordWrapColumn": 80
+			},
+			"[json]": {
+				"editor.tabSize": 2
+			},
+			"[yaml]": {
+				"editor.tabSize": 2
+			}
+		}
+	}
+}

@@ -1,0 +1,85 @@
+{
+	"name": "capybara-agent",
+	"displayName": "Capybara Session Dashboard",
+	"description": "Claude Code session tracking for Capybara",
+	"version": "0.2.0",
+	"publisher": "capybara",
+	"license": "MIT",
+	"engines": {
+		"vscode": "^1.96.0"
+	},
+	"categories": [
+		"Other"
+	],
+	"activationEvents": [
+		"onStartupFinished"
+	],
+	"main": "./out/extension.js",
+	"contributes": {
+		"commands": [
+			{
+				"command": "capybara.agent.newTask",
+				"title": "New Claude Chat",
+				"category": "Capybara"
+			},
+			{
+				"command": "capybara.agent.showDashboard",
+				"title": "Show Session Dashboard",
+				"category": "Capybara"
+			},
+			{
+				"command": "capybara.agent.debugSessions",
+				"title": "Debug Session Data",
+				"category": "Capybara"
+			}
+		],
+		"viewsContainers": {
+			"secondarySidebar": [
+				{
+					"id": "capybara-agent-panel",
+					"title": "Dashboard",
+					"icon": "$(comment-discussion)"
+				}
+			]
+		},
+		"views": {
+			"capybara-agent-panel": [
+				{
+					"id": "capybara.agentDashboard",
+					"name": "",
+					"type": "webview",
+					"visibility": "visible"
+				}
+			]
+		},
+		"menus": {
+			"commandPalette": [
+				{
+					"command": "capybara.agent.newTask",
+					"when": "true"
+				},
+				{
+					"command": "capybara.agent.debugSessions",
+					"when": "true"
+				}
+			]
+		},
+		"keybindings": [
+			{
+				"command": "capybara.agent.newTask",
+				"key": "cmd+k",
+				"mac": "cmd+k",
+				"when": "editorTextFocus || !editorTextFocus"
+			}
+		]
+	},
+	"scripts": {
+		"compile": "tsc -p ./",
+		"watch": "tsc -watch -p ./"
+	},
+	"devDependencies": {
+		"@types/node": "^20.0.0",
+		"@types/vscode": "^1.96.0",
+		"typescript": "^5.3.0"
+	}
+}

@@ -1,0 +1,34 @@
+.DS_Store
+.cache
+npm-debug.log
+Thumbs.db
+node_modules/
+.build/
+.vscode/extensions/**/out/
+extensions/**/dist/
+/out*/
+/extensions/**/out/
+build/node_modules
+coverage/
+test_data/
+test-results/
+test-results.xml
+vscode.lsif
+vscode.db
+/.profile-oss
+/cli/target
+/cli/openssl
+product.overrides.json
+*.snap.actual
+*.tsbuildinfo
+.vscode-test
+vscode-telemetry-docs/
+
+# Claude Code extension (downloaded during build, too large for git)
+extensions/.claude-code/
+
+# Capybara build artifacts
+*.dmg
+*.dmg.zip
+resources/darwin/*.iconset/
+resources/dmg-background.*
