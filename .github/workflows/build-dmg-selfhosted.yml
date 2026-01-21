@@ -252,7 +252,7 @@ jobs:
           echo "$DOWNLOAD_URL" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: Capybara-macOS-arm64-${{ steps.version.outputs.version }}
           path: Capybara-*.dmg
