@@ -1,0 +1,308 @@
+name: Build and Release Capybara DMG
+
+on:
+  push:
+    branches:
+      - dev-sam
+
+env:
+  NODE_VERSION: "22.21.1"
+
+jobs:
+  build:
+    name: Build Capybara for macOS (ARM64)
+    runs-on: macos-latest
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          npm_config_fetch_retries: 5
+          npm_config_fetch_retry_mintimeout: 20000
+          npm_config_fetch_retry_maxtimeout: 120000
+        run: |
+          # Increase network timeouts
+          npm config set fetch-timeout 600000
+          npm config set fetch-retries 5
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+
+          # Run npm ci with retry logic
+          for i in 1 2 3; do
+            npm ci && break || {
+              echo "npm ci attempt $i failed, retrying..."
+              sleep 10
+            }
+          done
+
+      - name: Install extension dependencies
+        run: |
+          cd extensions/capybara-defaults && npm ci
+          cd ../capybara-agent && npm ci
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Download Claude Code extension
+        env:
+          CLAUDE_CODE_S3_URL: s3://${{ secrets.S3_BUCKET }}/extensions/claude-code-2.0.75-darwin-arm64.tar.gz
+        run: bash scripts/download-claude-code.sh
+
+      - name: Setup Apple Developer Certificate
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          # Create variables
+          CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          # Decode certificate
+          echo -n "$CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+
+          # Create temporary keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Import certificate to keychain
+          security import $CERTIFICATE_PATH \
+            -P "$CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          # Allow codesign to access the keychain
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+      - name: Get signing identity
+        id: signing-identity
+        run: |
+          IDENTITY=$(security find-identity -v -p codesigning $RUNNER_TEMP/app-signing.keychain-db | grep "Developer ID Application" | head -1 | grep -o '".*"' | sed 's/"//g')
+          echo "identity=$IDENTITY" >> $GITHUB_OUTPUT
+          echo "Found identity: $IDENTITY"
+
+      - name: Compile project
+        run: npm run compile
+
+      - name: Download Electron
+        run: npm run electron
+
+      - name: Build macOS app (darwin-arm64)
+        run: npm run gulp -- vscode-darwin-arm64
+        timeout-minutes: 45
+
+      - name: Sign application
+        env:
+          SIGNING_IDENTITY: ${{ steps.signing-identity.outputs.identity }}
+        run: |
+          APP_PATH="../VSCode-darwin-arm64/Capybara.app"
+          ENTITLEMENTS="build/darwin/entitlements.plist"
+
+          echo "Signing all components with identity: $SIGNING_IDENTITY"
+          bash scripts/sign-app.sh "$APP_PATH" "$SIGNING_IDENTITY" "$ENTITLEMENTS"
+
+      - name: Create DMG
+        env:
+          SIGNING_IDENTITY: ${{ steps.signing-identity.outputs.identity }}
+        run: |
+          # Install create-dmg if needed
+          brew install create-dmg || true
+
+          APP_PATH="../VSCode-darwin-arm64/Capybara.app"
+          DMG_PATH="./Capybara-macOS-arm64.dmg"
+
+          # Create DMG
+          create-dmg \
+            --volname "Capybara" \
+            --volicon "resources/darwin/capybara.icns" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "Capybara.app" 175 190 \
+            --hide-extension "Capybara.app" \
+            --app-drop-link 425 190 \
+            --codesign "$SIGNING_IDENTITY" \
+            "$DMG_PATH" \
+            "$APP_PATH" || {
+              # Fallback to manual DMG creation if create-dmg fails
+              echo "create-dmg failed, using fallback method"
+              bash scripts/create-dmg.sh
+            }
+
+      - name: Notarize DMG
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          DMG_PATH="./Capybara-macOS-arm64.dmg"
+
+          echo "Submitting for notarization..."
+          SUBMISSION_ID=$(xcrun notarytool submit "$DMG_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait \
+            --timeout 30m \
+            --output-format json | jq -r '.id')
+
+          echo "Submission ID: $SUBMISSION_ID"
+
+          # Get notarization status and logs
+          echo "Getting notarization info..."
+          xcrun notarytool info "$SUBMISSION_ID" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID"
+
+          # Get detailed logs if failed
+          echo "Getting notarization logs..."
+          xcrun notarytool log "$SUBMISSION_ID" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            notarization-log.json || true
+
+          # Display logs
+          if [ -f notarization-log.json ]; then
+            echo "Notarization log:"
+            cat notarization-log.json
+          fi
+
+          # Check if notarization was successful
+          STATUS=$(xcrun notarytool info "$SUBMISSION_ID" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --output-format json | jq -r '.status')
+
+          if [ "$STATUS" != "Accepted" ]; then
+            echo "Error: Notarization failed with status: $STATUS"
+            echo "Check the logs above for details"
+            exit 1
+          fi
+
+          echo "Stapling notarization ticket..."
+          xcrun stapler staple "$DMG_PATH"
+
+          echo "Verifying notarization..."
+          spctl -a -vvv -t install "$DMG_PATH"
+
+      - name: Get version info
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          BUILD_DATE=$(date -u +"%Y%m%d-%H%M%S")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "commit=$COMMIT_SHA" >> $GITHUB_OUTPUT
+          echo "date=$BUILD_DATE" >> $GITHUB_OUTPUT
+
+      - name: Rename DMG with version
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          COMMIT="${{ steps.version.outputs.commit }}"
+          DATE="${{ steps.version.outputs.date }}"
+
+          mv Capybara-macOS-arm64.dmg "Capybara-${VERSION}-${COMMIT}-darwin-arm64.dmg"
+
+      - name: Upload to S3
+        env:
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          VERSION: ${{ steps.version.outputs.version }}
+          COMMIT: ${{ steps.version.outputs.commit }}
+        run: |
+          DMG_FILE="Capybara-${VERSION}-${COMMIT}-darwin-arm64.dmg"
+
+          # Upload with version in path
+          aws s3 cp "$DMG_FILE" \
+            "s3://${S3_BUCKET}/releases/${VERSION}/${DMG_FILE}" \
+            --acl private
+
+          # Also upload as "latest" for easy access
+          aws s3 cp "$DMG_FILE" \
+            "s3://${S3_BUCKET}/releases/latest/Capybara-latest-darwin-arm64.dmg" \
+            --acl private
+
+          # Generate presigned URL (valid for 7 days)
+          DOWNLOAD_URL=$(aws s3 presign \
+            "s3://${S3_BUCKET}/releases/${VERSION}/${DMG_FILE}" \
+            --expires-in 604800)
+
+          echo "Download URL (valid for 7 days):" >> $GITHUB_STEP_SUMMARY
+          echo "$DOWNLOAD_URL" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Capybara-macOS-arm64-${{ steps.version.outputs.version }}
+          path: Capybara-*.dmg
+          retention-days: 30
+
+      - name: Cleanup keychain
+        if: always()
+        run: |
+          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
+
+      - name: Create release notes
+        id: release-notes
+        run: |
+          cat << EOF > release-notes.md
+          ## Capybara ${{ steps.version.outputs.version }}
+
+          **Build Information:**
+          - Version: ${{ steps.version.outputs.version }}
+          - Commit: ${{ steps.version.outputs.commit }}
+          - Build Date: ${{ steps.version.outputs.date }}
+          - Platform: macOS (Apple Silicon)
+
+          **Installation:**
+          1. Download the DMG file from S3
+          2. Open the DMG and drag Capybara to Applications
+          3. Open Capybara from Applications folder
+
+          **What's Included:**
+          - Custom Capybara extensions (capybara-defaults, capybara-agent)
+          - Simplified UI for knowledge work
+          - Session Dashboard
+          - Automatic workspace setup
+
+          **Note:** This build is signed and notarized with Apple Developer credentials.
+          EOF
+
+          cat release-notes.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ steps.version.outputs.version }}';
+            const commit = '${{ steps.version.outputs.commit }}';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## ✅ Build Successful\n\n**Version:** ${version}\n**Commit:** ${commit}\n\nThe DMG has been uploaded to S3. Check the [workflow run](${context.payload.repository.html_url}/actions/runs/${context.runId}) for download links.`
+            });

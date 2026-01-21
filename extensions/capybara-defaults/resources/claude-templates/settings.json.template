@@ -1,0 +1,46 @@
+{
+    "hooks": {
+        "UserPromptSubmit": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": ".claude/hooks/scripts/session-tracker.sh"
+                    }
+                ]
+            }
+        ],
+        "PreToolUse": [
+            {
+                "matcher": "*",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": ".claude/hooks/scripts/session-tracker.sh"
+                    }
+                ]
+            }
+        ],
+        "PostToolUse": [
+            {
+                "matcher": "*",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": ".claude/hooks/scripts/session-tracker.sh"
+                    }
+                ]
+            }
+        ],
+        "Stop": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": ".claude/hooks/scripts/session-tracker.sh"
+                    }
+                ]
+            }
+        ]
+    }
+}
