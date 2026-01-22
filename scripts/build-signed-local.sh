@@ -15,11 +15,17 @@ TEMP_DIR="/tmp/capybara-signing"
 KEYCHAIN_PATH="$TEMP_DIR/app-signing.keychain-db"
 KEYCHAIN_PASSWORD="temp-build-keychain-$(date +%s)"
 
-# 从证书信息文件读取配置
-CERTIFICATE_PASSWORD="your_certificate_password"
-APPLE_TEAM_ID="your_team_id"
-APPLE_ID="your_apple_id@example.com"
-APPLE_ID_PASSWORD="your_app_specific_password"
+# 从环境变量读取配置（安全最佳实践）
+# 使用方式：
+#   export CERTIFICATE_PASSWORD="your_password"
+#   export APPLE_TEAM_ID="your_team_id"
+#   export APPLE_ID="your@email.com"
+#   export APPLE_ID_PASSWORD="your_app_specific_password"
+#   ./scripts/build-signed-local.sh
+CERTIFICATE_PASSWORD="${CERTIFICATE_PASSWORD:-}"
+APPLE_TEAM_ID="${APPLE_TEAM_ID:-}"
+APPLE_ID="${APPLE_ID:-}"
+APPLE_ID_PASSWORD="${APPLE_ID_PASSWORD:-}"
 
 # 检查证书文件
 if [ ! -f "$CERTIFICATE_PATH" ]; then
@@ -28,6 +34,33 @@ if [ ! -f "$CERTIFICATE_PATH" ]; then
 fi
 
 echo "✅ 证书文件检查通过"
+
+# 验证必需的环境变量
+if [ -z "$CERTIFICATE_PASSWORD" ]; then
+    echo "❌ 错误: 请设置 CERTIFICATE_PASSWORD 环境变量"
+    echo "   示例: export CERTIFICATE_PASSWORD=\"your_password\""
+    exit 1
+fi
+
+if [ -z "$APPLE_TEAM_ID" ]; then
+    echo "❌ 错误: 请设置 APPLE_TEAM_ID 环境变量"
+    echo "   示例: export APPLE_TEAM_ID=\"ABCD123456\""
+    exit 1
+fi
+
+if [ -z "$APPLE_ID" ]; then
+    echo "❌ 错误: 请设置 APPLE_ID 环境变量"
+    echo "   示例: export APPLE_ID=\"your@email.com\""
+    exit 1
+fi
+
+if [ -z "$APPLE_ID_PASSWORD" ]; then
+    echo "❌ 错误: 请设置 APPLE_ID_PASSWORD 环境变量"
+    echo "   示例: export APPLE_ID_PASSWORD=\"xxxx-xxxx-xxxx-xxxx\""
+    exit 1
+fi
+
+echo "✅ 环境变量验证通过"
 
 # 创建临时目录
 mkdir -p "$TEMP_DIR"
